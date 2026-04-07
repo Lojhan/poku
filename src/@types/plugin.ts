@@ -116,3 +116,16 @@ export type ScopeHookProvider = {
     fn: (params?: ScopeHookParams) => Promise<unknown> | unknown
   ) => Promise<void>;
 };
+
+// Internal composition helpers used by the plugins runtime.
+export type ScopeHookComposedHolder = ScopeHookHolder & {
+  __pokuProviders?: ScopeHookHolder[];
+};
+
+export type ScopeHooksWithProviders = ScopeHooks & {
+  [key: symbol]: ScopeHookProvider[] | undefined;
+};
+
+export type ScopeHooksGlobal = typeof globalThis & {
+  [key: symbol]: ScopeHooksWithProviders | undefined;
+};
