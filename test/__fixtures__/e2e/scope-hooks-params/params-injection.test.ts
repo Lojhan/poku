@@ -2,8 +2,8 @@ import { assert } from '../../../../src/modules/essentials/assert.js';
 import { describe } from '../../../../src/modules/helpers/describe.js';
 import { it } from '../../../../src/modules/helpers/it/core.js';
 import { test } from '../../../../src/modules/helpers/test.js';
-import { registerAlphaPlugin } from './plugins/alpha.plugin.ts';
-import { registerBetaPlugin } from './plugins/beta.plugin.ts';
+import { registerAlphaPlugin } from './plugins/alpha.plugin.js';
+import { registerBetaPlugin } from './plugins/beta.plugin.js';
 
 registerAlphaPlugin();
 registerBetaPlugin();
