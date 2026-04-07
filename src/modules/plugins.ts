@@ -1,6 +1,6 @@
+import type { Buffer } from 'node:buffer';
 import type { SpawnOptionsWithoutStdio } from 'node:child_process';
 import type { InspectCLIResult, PokuPlugin } from '../@types/plugin.js';
-import type { Buffer } from 'node:buffer';
 import { spawn } from 'node:child_process';
 import { env } from 'node:process';
 import { kill as pokuKill } from '../modules/helpers/kill.js';
