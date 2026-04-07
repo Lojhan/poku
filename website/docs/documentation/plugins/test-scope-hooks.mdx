@@ -39,10 +39,12 @@ type ScopeHooks = {
   createHolder: () => { scope: unknown };
   runScoped: (
     holder: { scope: unknown },
-    fn: () => Promise<unknown> | unknown
+    fn: (params?: Record<string, unknown>) => Promise<unknown> | unknown
   ) => Promise<void>;
 };
 ```
+
+`runScoped` can forward params to the test callback by calling `fn({ ... })`.
 
 ## Registration API
 
@@ -55,9 +57,49 @@ composeScopeHooks({
   name: '@acme/my-plugin.scope-hooks',
   createHolder: () => ({ scope: undefined }),
   runScoped: async (holder, fn) => {
-    const result = fn();
+    const result = fn({ value: 'hello' });
     if (result instanceof Promise) await result;
   },
+});
+```
+
+## Typed Context (Full Type Safety)
+
+To get fully typed callback params in `it` / `test`, augment `ScopeHookContextMap` from `poku/plugins` in your plugin package.
+
+```ts
+// my-plugin.d.ts
+declare module 'poku/plugins' {
+  interface ScopeHookContextMap {
+    '@acme/my-plugin.scope-hooks': {
+      value: string;
+    };
+  }
+}
+```
+
+Then register your provider:
+
+```ts
+import { composeScopeHooks } from 'poku/plugins';
+
+composeScopeHooks({
+  name: '@acme/my-plugin.scope-hooks',
+  createHolder: () => ({ scope: undefined }),
+  runScoped: async (_holder, fn) => {
+    const result = fn({ value: 'hello' });
+    if (result instanceof Promise) await result;
+  },
+});
+```
+
+And test callbacks become typed automatically:
+
+```ts
+import { it, assert } from 'poku';
+
+it('has value', ({ value }) => {
+  assert.ok(value);
 });
 ```
 
@@ -94,7 +136,7 @@ type ScopeHooks = {
   createHolder: () => { scope: unknown };
   runScoped: (
     holder: { scope: unknown },
-    fn: () => Promise<unknown> | unknown
+    fn: (params?: Record<string, unknown>) => Promise<unknown> | unknown
   ) => Promise<void>;
 };
 
@@ -111,7 +153,7 @@ composeScopeHooks({
     holder.scope = { id };
 
     await als.run({ id }, async () => {
-      const result = fn();
+      const result = fn({ id });
       if (result instanceof Promise) await result;
     });
   },

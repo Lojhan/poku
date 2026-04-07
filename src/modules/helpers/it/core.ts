@@ -1,3 +1,4 @@
+import type { ScopeHookParams } from '../../../@types/plugin.js';
 import { AssertionError } from 'node:assert';
 import process from 'node:process';
 import { each } from '../../../configs/each.js';
@@ -12,14 +13,22 @@ export const getTitle = (input: unknown): string | undefined =>
 
 export const getCallback = (
   input: unknown
-): (() => unknown) | (() => Promise<unknown>) | undefined =>
+):
+  | ((params?: ScopeHookParams) => unknown)
+  | ((params?: ScopeHookParams) => Promise<unknown>)
+  | undefined =>
   typeof input === 'function'
-    ? (input as (() => unknown) | (() => Promise<unknown>))
+    ? (input as
+        | ((params?: ScopeHookParams) => unknown)
+        | ((params?: ScopeHookParams) => Promise<unknown>))
     : undefined;
 
+const normalizeContext = (params?: ScopeHookParams): ScopeHookParams =>
+  params ?? {};
+
 export const itBase = async (
-  titleOrCb: string | (() => unknown | Promise<unknown>),
-  callback?: () => unknown | Promise<unknown>
+  titleOrCb: string | ((params: ScopeHookParams) => unknown | Promise<unknown>),
+  callback?: (params: ScopeHookParams) => unknown | Promise<unknown>
 ): Promise<void> => {
   try {
     const title = getTitle(titleOrCb);
@@ -61,9 +70,11 @@ export const itBase = async (
       const hooks = getScopeHooks();
       if (hooks) {
         const holder = hooks.createHolder();
-        await hooks.runScoped(holder, () => cb!());
+        await hooks.runScoped(holder, (params) =>
+          cb!(normalizeContext(params))
+        );
       } else {
-        const resultCb = cb!();
+        const resultCb = cb!(normalizeContext());
         if (resultCb instanceof Promise) await resultCb;
       }
     } catch (error) {
@@ -107,13 +118,23 @@ export const itBase = async (
   }
 };
 
-async function itCore(title: string, cb: () => Promise<unknown>): Promise<void>;
-function itCore(title: string, cb: () => unknown): void;
-async function itCore(cb: () => Promise<unknown>): Promise<void>;
-function itCore(cb: () => unknown): void;
 async function itCore(
-  titleOrCb: string | (() => unknown) | (() => Promise<unknown>),
-  cb?: (() => unknown) | (() => Promise<unknown>)
+  title: string,
+  cb: (params: ScopeHookParams) => Promise<unknown>
+): Promise<void>;
+function itCore(title: string, cb: (params: ScopeHookParams) => unknown): void;
+async function itCore(
+  cb: (params: ScopeHookParams) => Promise<unknown>
+): Promise<void>;
+function itCore(cb: (params: ScopeHookParams) => unknown): void;
+async function itCore(
+  titleOrCb:
+    | string
+    | ((params: ScopeHookParams) => unknown)
+    | ((params: ScopeHookParams) => Promise<unknown>),
+  cb?:
+    | ((params: ScopeHookParams) => unknown)
+    | ((params: ScopeHookParams) => Promise<unknown>)
 ): Promise<void> {
   if (GLOBAL.configs.testNamePattern && typeof titleOrCb === 'string') {
     if (!GLOBAL.configs.testNamePattern.test(titleOrCb)) return;

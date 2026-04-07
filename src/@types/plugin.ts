@@ -97,15 +97,22 @@ export type InspectCLIResult = {
 
 export type ScopeHookHolder = { scope: unknown };
 
+export type ScopeHookParams = Record<string, unknown>;
+
 export type ScopeHooks = {
   createHolder: () => ScopeHookHolder;
   runScoped: (
     holder: ScopeHookHolder,
-    fn: () => Promise<unknown> | unknown
+    fn: (params?: ScopeHookParams) => Promise<unknown> | unknown
   ) => Promise<void>;
 };
 
-export type ScopeHookProvider = ScopeHooks & {
+export type ScopeHookProvider = {
   /** Stable provider id for deterministic dedupe/composition. */
   name: string;
+  createHolder: () => ScopeHookHolder;
+  runScoped: (
+    holder: ScopeHookHolder,
+    fn: (params?: ScopeHookParams) => Promise<unknown> | unknown
+  ) => Promise<void>;
 };

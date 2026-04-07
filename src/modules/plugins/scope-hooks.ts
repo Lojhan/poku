@@ -1,5 +1,6 @@
 import type {
   ScopeHookHolder,
+  ScopeHookParams,
   ScopeHookProvider,
   ScopeHooks,
 } from '../../@types/plugin.js';
@@ -46,6 +47,14 @@ const normalizeProviders = (
   ];
 };
 
+const mergeScopeParams = (
+  base: ScopeHookParams,
+  incoming?: ScopeHookParams
+): ScopeHookParams => {
+  if (!incoming) return base;
+  return { ...base, ...incoming };
+};
+
 const createComposedHooks = (
   providers: ScopeHookProvider[]
 ): ScopeHooksWithProviders => {
@@ -69,9 +78,12 @@ const createComposedHooks = (
         composedHolder.__pokuProviders ??
         providers.map((provider) => provider.createHolder());
 
-      const invoke = async (index: number): Promise<void> => {
+      const invoke = async (
+        index: number,
+        params: ScopeHookParams
+      ): Promise<void> => {
         if (index >= providers.length) {
-          const result = fn();
+          const result = fn(params);
           if (result instanceof Promise) await result;
           return;
         }
@@ -83,10 +95,12 @@ const createComposedHooks = (
           throw new Error('Invalid scope hook composition state');
         }
 
-        await provider.runScoped(providerHolder, () => invoke(index + 1));
+        await provider.runScoped(providerHolder, (incomingParams) =>
+          invoke(index + 1, mergeScopeParams(params, incomingParams))
+        );
       };
 
-      await invoke(0);
+      await invoke(0, {});
     },
   };
 

@@ -1,3 +1,4 @@
+import { afterEach } from '../../ci/src/services/each.js';
 import { assert } from '../../src/modules/essentials/assert.js';
 import { test } from '../../src/modules/helpers/test.js';
 import { defineConfig } from '../../src/modules/index.js';
@@ -108,4 +109,45 @@ test('composeScopeHooks dedupes providers by name', () => {
     if (original === undefined) delete g[SCOPE_HOOKS_KEY];
     else g[SCOPE_HOOKS_KEY] = original;
   }
+});
+
+test('composeScopeHooks merges params from providers', async () => {
+  const SCOPE_HOOKS_KEY = Symbol.for('@pokujs/poku.test-scope-hooks');
+  const g = globalThis as Record<symbol, unknown>;
+  const original = g[SCOPE_HOOKS_KEY];
+
+  afterEach(() => {
+    if (original === undefined) delete g[SCOPE_HOOKS_KEY];
+    else g[SCOPE_HOOKS_KEY] = original;
+  });
+
+  delete g[SCOPE_HOOKS_KEY];
+
+  composeScopeHooks({
+    name: 'provider-alpha',
+    createHolder: () => ({ scope: undefined }),
+    runScoped: async (_holder, fn) => {
+      const result = fn({ alpha: 1 });
+      if (result instanceof Promise) await result;
+    },
+  });
+
+  const hooks = composeScopeHooks({
+    name: 'provider-beta',
+    createHolder: () => ({ scope: undefined }),
+    runScoped: async (_holder, fn) => {
+      const result = fn({ beta: 2 });
+      if (result instanceof Promise) await result;
+    },
+  });
+
+  const holder = hooks.createHolder();
+
+  await hooks.runScoped(holder, (params) => {
+    assert.deepStrictEqual(
+      params,
+      { alpha: 1, beta: 2 },
+      'Provider params are merged into callback context'
+    );
+  });
 });

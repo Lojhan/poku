@@ -49,10 +49,12 @@ type ScopeHooks = {
   createHolder: () => { scope: unknown };
   runScoped: (
     holder: { scope: unknown },
-    fn: () => Promise<unknown> | unknown
+    fn: (params?: Record<string, unknown>) => Promise<unknown> | unknown
   ) => Promise<void>;
 };
 ```
+
+`runScoped` pode encaminhar params para o callback de teste chamando `fn({ ... })`.
 
 ## API de Registro
 
@@ -65,9 +67,49 @@ composeScopeHooks({
   name: '@acme/meu-plugin.scope-hooks',
   createHolder: () => ({ scope: undefined }),
   runScoped: async (holder, fn) => {
-    const result = fn();
+    const result = fn({ value: 'ola' });
     if (result instanceof Promise) await result;
   },
+});
+```
+
+## Contexto Tipado (Type Safety Completo)
+
+Para ter params totalmente tipados em callbacks de `it` / `test`, faca augment de `ScopeHookContextMap` de `poku/plugins` no pacote do plugin.
+
+```ts
+// meu-plugin.d.ts
+declare module 'poku/plugins' {
+  interface ScopeHookContextMap {
+    '@acme/meu-plugin.scope-hooks': {
+      value: string;
+    };
+  }
+}
+```
+
+Depois registre o provider:
+
+```ts
+import { composeScopeHooks } from 'poku/plugins';
+
+composeScopeHooks({
+  name: '@acme/meu-plugin.scope-hooks',
+  createHolder: () => ({ scope: undefined }),
+  runScoped: async (_holder, fn) => {
+    const result = fn({ value: 'ola' });
+    if (result instanceof Promise) await result;
+  },
+});
+```
+
+E os callbacks de teste ficam tipados automaticamente:
+
+```ts
+import { it, assert } from 'poku';
+
+it('tem value', ({ value }) => {
+  assert.ok(value);
 });
 ```
 
@@ -104,7 +146,7 @@ type ScopeHooks = {
   createHolder: () => { scope: unknown };
   runScoped: (
     holder: { scope: unknown },
-    fn: () => Promise<unknown> | unknown
+    fn: (params?: Record<string, unknown>) => Promise<unknown> | unknown
   ) => Promise<void>;
 };
 
@@ -121,7 +163,7 @@ composeScopeHooks({
     holder.scope = { id };
 
     await als.run({ id }, async () => {
-      const result = fn();
+      const result = fn({ id });
       if (result instanceof Promise) await result;
     });
   },
