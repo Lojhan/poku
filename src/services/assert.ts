@@ -11,6 +11,8 @@ const assertProcessor = () => {
     if (typeof message === 'string') reporter.onAssertionSuccess({ message });
   };
 
+  const DEFERRED_ASSERTION_KEY = Symbol.for('@poku/deferred-assertion');
+
   const handleError = (
     error: unknown,
     options: ProcessAssertionOptions
@@ -18,6 +20,15 @@ const assertProcessor = () => {
     const ctx = retryContext.stack?.[retryContext.stack.length - 1];
     if (ctx) {
       ctx.failed = true;
+      if (ctx.silent) {
+        if (error instanceof AssertionError) {
+          Object.defineProperty(error, DEFERRED_ASSERTION_KEY, {
+            value: () => handleError(error, options),
+            configurable: true,
+          });
+        }
+        throw error;
+      }
     } else {
       process.exitCode = 1;
     }

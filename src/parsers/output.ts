@@ -8,7 +8,10 @@ const ANSI_RESET = '\x1b[0m';
 export const timeoutMessage = (ms: number): string =>
   `${format(`● Timeout: test file exceeded ${ms}ms limit`).fail().bold()}`;
 
-export const serialize = (value: unknown): unknown => {
+export const serialize = (
+  value: unknown,
+  seen: WeakSet<object> = new WeakSet()
+): unknown => {
   if (
     typeof value === 'undefined' ||
     typeof value === 'function' ||
@@ -17,13 +20,40 @@ export const serialize = (value: unknown): unknown => {
     value instanceof RegExp
   )
     return String(value);
-  if (Array.isArray(value)) return value.map(serialize);
-  if (value instanceof Set) return Array.from(value).map(serialize);
-  if (value instanceof Map) return serialize(Object.fromEntries(value));
-  if (value !== null && typeof value === 'object')
-    return Object.fromEntries(
-      Object.entries(value).map(([key, val]) => [key, serialize(val)])
-    );
+
+  if (value !== null && typeof value === 'object') {
+    if (
+      typeof (value as { nodeType?: unknown }).nodeType === 'number' &&
+      typeof (value as { nodeName?: unknown }).nodeName === 'string'
+    ) {
+      const outerHTML = (value as { outerHTML?: unknown }).outerHTML;
+      if (typeof outerHTML === 'string') return outerHTML;
+      return `[DOMNode ${(value as { nodeName: string }).nodeName}]`;
+    }
+
+    if (seen.has(value)) return '[Circular]';
+    seen.add(value);
+
+    try {
+      if (Array.isArray(value))
+        return value.map((item) => serialize(item, seen));
+      if (value instanceof Set)
+        return Array.from(value, (item) => serialize(item, seen));
+      if (value instanceof Map)
+        return Object.fromEntries(
+          Array.from(value.entries(), ([key, val]) => [
+            String(serialize(key, seen)),
+            serialize(val, seen),
+          ])
+        );
+
+      return Object.fromEntries(
+        Object.entries(value).map(([key, val]) => [key, serialize(val, seen)])
+      );
+    } finally {
+      seen.delete(value);
+    }
+  }
 
   return value;
 };

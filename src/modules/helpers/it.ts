@@ -22,103 +22,117 @@ export const itBase = async (
   titleOrCb: string | TestCb,
   callback?: TestCb
 ): Promise<void> => {
+  let increasedDepth = false;
   try {
     const title = getTitle(titleOrCb);
     const hasTitle = typeof title === 'string';
     const cb = hasTitle ? getCallback(callback) : getCallback(titleOrCb);
 
     let success = true;
-    let start: [number, number];
-    let end: [number, number];
+    let start: [number, number] = [0, 0];
+    let end: [number, number] = [0, 0];
 
     GLOBAL.reporter.onItStart({ title });
 
-    if (hasTitle) indentation.itDepth++;
-
-    if (typeof each.before.cb === 'function') {
-      const beforeResult = each.before.cb();
-
-      if (beforeResult instanceof Promise) await beforeResult;
+    if (hasTitle) {
+      indentation.itDepth++;
+      increasedDepth = true;
     }
 
-    const insideDescribe = errorHoist.depth > 0;
+    const hooks = getScopeHook();
+    const reportResult = (): void => {
+      if (!title) return;
 
-    let onError: ((error: unknown) => void) | undefined;
+      const duration = end[0] * 1e3 + end[1] / 1e6;
 
-    if (!insideDescribe) {
-      onError = (error: unknown): void => {
-        const ctx = retryContext.stack?.[retryContext.stack.length - 1];
-        if (ctx) {
-          ctx.failed = true;
-        } else {
-          process.exitCode = 1;
-          success = false;
-          if (!(error instanceof AssertionError)) console.error(error);
-        }
-      };
+      indentation.itDepth--;
+      increasedDepth = false;
+      GLOBAL.reporter.onItEnd({ title, duration, success });
+    };
 
-      process.once('uncaughtException', onError);
-      process.once('unhandledRejection', onError);
-    } else errorHoist.failed = false;
-
-    start = process.hrtime();
-
-    try {
-      const hooks = getScopeHook();
-
+    const runWithOptionalScope = async (
+      fn: (params?: Record<string, unknown>) => Promise<void>
+    ): Promise<void> => {
       if (hooks) {
         const holder = hooks.createHolder();
-        await hooks.runScoped(holder, (params) => cb!(params));
+        await hooks.runScoped(holder, fn);
       } else {
-        const resultCb = cb!();
-        if (resultCb instanceof Promise) await resultCb;
+        await fn();
       }
-    } catch (error) {
-      const ctx = retryContext.stack?.[retryContext.stack.length - 1];
-      if (ctx) {
-        ctx.failed = true;
-      } else {
-        process.exitCode = 1;
-        success = false;
-        if (!(error instanceof AssertionError)) console.error(error);
-      }
-    } finally {
-      end = process.hrtime(start);
+    };
 
-      if (onError) {
-        process.removeListener('uncaughtException', onError);
-        process.removeListener('unhandledRejection', onError);
-      } else if (errorHoist.failed) {
-        const ctx = retryContext.stack?.[retryContext.stack.length - 1];
-        if (ctx) {
-          ctx.failed = true;
-        } else {
-          success = false;
+    await runWithOptionalScope(async (params) => {
+      try {
+        if (typeof each.before.cb === 'function') {
+          const beforeResult = each.before.cb();
+
+          if (beforeResult instanceof Promise) await beforeResult;
         }
-        errorHoist.failed = false;
+
+        const insideDescribe = errorHoist.depth > 0;
+
+        let onError: ((error: unknown) => void) | undefined;
+
+        if (!insideDescribe) {
+          onError = (error: unknown): void => {
+            const ctx = retryContext.stack?.[retryContext.stack.length - 1];
+            if (ctx) {
+              ctx.failed = true;
+            } else {
+              process.exitCode = 1;
+              success = false;
+              if (!(error instanceof AssertionError)) console.error(error);
+            }
+          };
+
+          process.once('uncaughtException', onError);
+          process.once('unhandledRejection', onError);
+        } else errorHoist.failed = false;
+
+        start = process.hrtime();
+
+        try {
+          const resultCb = cb!(params);
+          if (resultCb instanceof Promise) await resultCb;
+        } catch (error) {
+          const ctx = retryContext.stack?.[retryContext.stack.length - 1];
+          if (ctx) {
+            ctx.failed = true;
+          } else {
+            process.exitCode = 1;
+            success = false;
+            if (!(error instanceof AssertionError)) console.error(error);
+          }
+        } finally {
+          end = process.hrtime(start);
+
+          if (onError) {
+            process.removeListener('uncaughtException', onError);
+            process.removeListener('unhandledRejection', onError);
+          } else if (errorHoist.failed) {
+            const ctx = retryContext.stack?.[retryContext.stack.length - 1];
+            if (ctx) {
+              ctx.failed = true;
+            } else {
+              success = false;
+            }
+            errorHoist.failed = false;
+          }
+        }
+      } finally {
+        if (typeof each.after.cb === 'function') {
+          const afterResult = each.after.cb();
+
+          if (afterResult instanceof Promise) await afterResult;
+        }
       }
-    }
 
-    if (typeof each.after.cb === 'function') {
-      const afterResult = each.after.cb();
+      if (!hooks) reportResult();
+    });
 
-      if (afterResult instanceof Promise) await afterResult;
-    }
-
-    if (!title) return;
-
-    const duration = end[0] * 1e3 + end[1] / 1e6;
-
-    indentation.itDepth--;
-    GLOBAL.reporter.onItEnd({ title, duration, success });
+    if (hooks) reportResult();
   } catch (error) {
-    if (indentation.itDepth > 0) indentation.itDepth--;
-
-    if (typeof each.after.cb === 'function') {
-      const afterResult = each.after.cb();
-
-      if (afterResult instanceof Promise) await afterResult;
-    }
+    if (increasedDepth) indentation.itDepth--;
 
     throw error;
   }

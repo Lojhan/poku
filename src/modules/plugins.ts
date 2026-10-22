@@ -1,6 +1,7 @@
 import type { SpawnOptionsWithoutStdio } from 'node:child_process';
 import type { InspectCLIResult, PokuPlugin } from '../@types/plugin.js';
 import { spawn } from 'node:child_process';
+import { isAbsolute } from 'node:path';
 import { env } from 'node:process';
 import { kill as pokuKill } from '../modules/helpers/kill.js';
 import { runner } from '../parsers/get-runner.js';
@@ -40,7 +41,7 @@ export const inspectPoku = (options: {
 }): Promise<InspectCLIResult> => {
   const { command, spawnOptions, bin = pokuBin } = options;
   const ext = bin.endsWith('.ts') ? 'ts' : 'js';
-  const cmd = runner(`_.${ext}`).join(' ');
+  const [runtime, ...runtimeArgs] = runner(`_.${ext}`);
   const basePath =
     typeof spawnOptions?.cwd === 'string'
       ? spawnOptions.cwd
@@ -49,8 +50,12 @@ export const inspectPoku = (options: {
           .join('')
       : './';
 
-  const fullCommand = `${cmd} ${basePath}${bin} ${command}`;
-  const [runtime, ...args] = fullCommand.split(' ');
+  const resolvedBin = isAbsolute(bin) ? bin : `${basePath}${bin}`;
+  const args = [
+    ...runtimeArgs,
+    resolvedBin,
+    ...command.split(' ').filter(Boolean),
+  ];
 
   return new Promise((resolve, reject) => {
     const childProcess = spawn(runtime, args, {

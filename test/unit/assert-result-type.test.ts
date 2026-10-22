@@ -161,4 +161,27 @@ test('Assert: Parse Result Type', async () => {
     'Symbol(key)',
     'Symbol.for'
   );
+
+  const circular: Record<string, unknown> = { name: 'root' };
+  circular.self = circular;
+  assert.deepStrictEqual(
+    parseResultType(circular),
+    `{
+  "name": "root",
+  "self": "[Circular]"
+}`,
+    'Circular Object'
+  );
+
+  const fakeDomElement: Record<string, unknown> = {
+    nodeType: 1,
+    nodeName: 'DIV',
+    outerHTML: '<div data-testid="modal">Hello</div>',
+  };
+  fakeDomElement.__reactFiber = fakeDomElement;
+  assert.deepStrictEqual(
+    parseResultType(fakeDomElement),
+    '<div data-testid="modal">Hello</div>',
+    'DOM Element with circular fiber'
+  );
 });
