@@ -2,7 +2,8 @@ import { poku } from '../../../../src/modules/essentials/poku.js';
 
 process.exitCode = 1;
 
-const code = await poku('pass.test.ts', {
+const extension = process.env.NODE_ENV === 'build' ? 'js' : 'ts';
+const code = await poku(`pass.test.${extension}`, {
   noExit: true,
   isolation: 'none',
   quiet: true,

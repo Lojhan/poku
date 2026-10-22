@@ -1,5 +1,30 @@
 # Changelog
 
+## [4.5.0](https://github.com/wellwelwel/poku/compare/v4.4.0...v4.5.0) (2026-06-10)
+
+
+### Features
+
+* **serializer:** support for advanced assertion types output ([#1136](https://github.com/wellwelwel/poku/issues/1136)) ([ad8bc5d](https://github.com/wellwelwel/poku/commit/ad8bc5d47ddc50669c13fa6901a4aae60e143bf6))
+
+
+### Bug Fixes
+
+* remove redundant path sanitize ([#1141](https://github.com/wellwelwel/poku/issues/1141)) ([b5c42e4](https://github.com/wellwelwel/poku/commit/b5c42e4fe8451337ba5985480677fae8e4cf8aab))
+* remove redundant sanitize ([b5c42e4](https://github.com/wellwelwel/poku/commit/b5c42e4fe8451337ba5985480677fae8e4cf8aab))
+
+## [4.4.0](https://github.com/wellwelwel/poku/compare/v4.3.2...v4.4.0) (2026-06-08)
+
+
+### Features
+
+* retry block ([#1127](https://github.com/wellwelwel/poku/issues/1127)) ([2648bb0](https://github.com/wellwelwel/poku/commit/2648bb0341ebfed597cd845826c258b32ddfffdd))
+
+
+### Bug Fixes
+
+* **retry:** ensure all errors are reported ([#1131](https://github.com/wellwelwel/poku/issues/1131)) ([4677bff](https://github.com/wellwelwel/poku/commit/4677bff7cd237280156269efea02983ef13e090f))
+
 ## [4.3.2](https://github.com/wellwelwel/poku/compare/v4.3.1...v4.3.2) (2026-05-22)
 
 

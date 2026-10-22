@@ -1,4 +1,4 @@
-import type { RetryState } from '../@types/retry.js';
+import type { RetryContext, RetryState } from '../@types/retry.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { getSharedState } from './shared-state.js';
 
@@ -15,3 +15,6 @@ export const retryContext: RetryState = getSharedState<RetryState>(
     },
   }
 );
+
+export const peekRetryContext = (): RetryContext | undefined =>
+  retryContext.stack?.[retryContext.stack.length - 1];

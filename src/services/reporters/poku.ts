@@ -4,9 +4,9 @@ import { relative, resolve } from 'node:path';
 import { stdout } from 'node:process';
 import { cwd } from '../../configs/cwd.js';
 import { indentation } from '../../configs/indentation.js';
-import { getSharedState } from '../../configs/shared-state.js';
-import { parseResultType } from '../../parsers/assert.js';
+import { addError, errors } from '../../configs/results.js';
 import { findFileFromStack } from '../../parsers/find-file-from-stack.js';
+import { serialize } from '../../parsers/output.js';
 import { parseTime, parseTimeToSecs } from '../../parsers/time.js';
 import { format } from '../format.js';
 import { hr, log } from '../write.js';
@@ -17,10 +17,26 @@ const ARROW_FAIL = '\x1b[91m\x1b[1m›\x1b[0m';
 const getIndent = () =>
   indentation.test.repeat(indentation.describeDepth + indentation.itDepth);
 
-export const errors = getSharedState<{ file: string; output?: string }[]>(
-  'errors',
-  []
-);
+const logEndResult = ({
+  title,
+  duration,
+  success = true,
+}: {
+  title?: string;
+  duration: number;
+  success?: boolean;
+}) => {
+  const status = success ? 'success' : 'fail';
+  const indent = getIndent();
+
+  log(
+    `${indent}${format(`● ${title}`)[status]().bold()} ${format(
+      `› ${duration.toFixed(6)}ms`
+    )
+      [status]()
+      .dim()}`
+  );
+};
 
 export const poku: ReturnType<ReporterPlugin> = (() => {
   return {
@@ -48,18 +64,8 @@ export const poku: ReturnType<ReporterPlugin> = (() => {
 
       log(`${indent}${format(`◌ ${title}`).bold().dim()}`);
     },
-    onDescribeEnd({ title, duration, success = true }) {
-      const status = success ? 'success' : 'fail';
-
-      const indent = getIndent();
-
-      log(
-        `${indent}${format(`● ${title}`)[status]().bold()} ${format(
-          `› ${duration.toFixed(6)}ms`
-        )
-          [status]()
-          .dim()}`
-      );
+    onDescribeEnd(options) {
+      logEndResult(options);
     },
     onItStart({ title }) {
       if (!title) return;
@@ -68,18 +74,8 @@ export const poku: ReturnType<ReporterPlugin> = (() => {
 
       log(`${indent}${format(`◌ ${title}`).dim()}`);
     },
-    onItEnd({ title, duration, success = true }) {
-      const status = success ? 'success' : 'fail';
-
-      const indent = getIndent();
-
-      log(
-        `${indent}${format(`● ${title}`)[status]().bold()} ${format(
-          `› ${duration.toFixed(6)}ms`
-        )
-          [status]()
-          .dim()}`
-      );
+    onItEnd(options) {
+      logEndResult(options);
     },
     onAssertionSuccess({ message }) {
       const preIdentation = getIndent();
@@ -119,8 +115,8 @@ export const poku: ReturnType<ReporterPlugin> = (() => {
       log(`${format(`${preIdentation}  Operator`).dim()} ${operator}\n`);
 
       if (!options?.hideDiff) {
-        const splitActual = parseResultType(actual).split('\n');
-        const splitExpected = parseResultType(expected).split('\n');
+        const splitActual = serialize(actual).split('\n');
+        const splitExpected = serialize(expected).split('\n');
 
         log(format(`${preIdentation}  ${options?.actual ?? 'Actual'}:`).dim());
 
@@ -156,17 +152,13 @@ export const poku: ReturnType<ReporterPlugin> = (() => {
       log(`${indent}${format(`● ${message}`).cyan().bold()}`);
     },
     onRetryStart({ attempt, total }) {
-      const indent = indentation.test.repeat(
-        indentation.describeDepth + indentation.itDepth
-      );
+      const indent = getIndent();
 
       log(`${indent}${format(`↻ Retry ${attempt}/${total}`).dim()}`);
     },
     onRetryEnd({ attempt, success }) {
       if (success && attempt > 1) {
-        const indent = indentation.test.repeat(
-          indentation.describeDepth + indentation.itDepth
-        );
+        const indent = getIndent();
 
         log(`${indent}${format(`✔ Retry succeeded`).success().dim()}`);
       }
@@ -194,10 +186,7 @@ export const poku: ReturnType<ReporterPlugin> = (() => {
         );
 
       if (!status) {
-        errors.push({
-          file: path.relative,
-          output,
-        });
+        addError(path.relative, output);
 
         if (output) log(output);
       }
@@ -210,10 +199,7 @@ export const poku: ReturnType<ReporterPlugin> = (() => {
         `${format(String(errors.length)).fail().bold()} ${format('test file(s) failed:').bold()}\n`
       );
 
-      for (const i in errors) {
-        const { file, output } = errors[i];
-        const index = +i;
-
+      for (const [index, { file, output }] of errors.entries()) {
         index > 0 && stdout.write('\n');
 
         log(

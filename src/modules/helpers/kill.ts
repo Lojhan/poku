@@ -5,21 +5,17 @@ import {
 } from '../../services/pid.js';
 import { getPIDs } from './get-pids.js';
 
-const killPID = async (PID: number | number[]): Promise<void> => {
+const killPID = async (PID: number | number[]) => {
   const PIDs = setPortsAndPIDs(PID);
 
   await Promise.all(
-    PIDs.map(async (p) => {
-      isWindows
-        ? await killPIDService.windows(p)
-        : await killPIDService.unix(p);
-    })
+    PIDs.map(async (p) =>
+      isWindows ? killPIDService.windows(p) : killPIDService.unix(p)
+    )
   );
 };
 
-const killPort = async (port: number | number[]): Promise<void> => {
-  const PIDs = await getPIDs(port);
-
+const killPIDs = async (PIDs: number[]) => {
   for (const PID of PIDs) {
     if (!PID) continue;
 
@@ -27,22 +23,14 @@ const killPort = async (port: number | number[]): Promise<void> => {
   }
 };
 
-const killRange = async (startsAt: number, endsAt: number): Promise<void> => {
-  const PIDs = await getPIDs.range(startsAt, endsAt);
+const killPort = async (port: number | number[]) =>
+  killPIDs(await getPIDs(port));
 
-  for (const PID of PIDs) {
-    if (!PID) continue;
+const killRange = async (startsAt: number, endsAt: number) =>
+  killPIDs(await getPIDs.range(startsAt, endsAt));
 
-    await killPID(PID);
-  }
-};
-
-/** Kill processes by PIDs, ports and port ranges. */
 export const kill = {
-  /** Kill the specified process ID */
   pid: killPID,
-  /** Kill all processes listening on the specified port */
   port: killPort,
-  /** Kill all processes listening on the specified range ports */
   range: killRange,
 };

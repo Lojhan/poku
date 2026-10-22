@@ -1,5 +1,5 @@
 import { strict as nodeAssert } from 'node:assert';
-import { inspectPoku } from '../__utils__/capture-cli.test.js';
+import { inspectPoku, isBuild } from '../__utils__/capture-cli.test.js';
 import { describe } from '../../src/modules/helpers/describe.js';
 import { it } from '../../src/modules/helpers/it.js';
 
@@ -13,7 +13,8 @@ describe('In-process asynchronous error diagnostics', async () => {
     ],
   ]) {
     await it(`preserves ${event} on stderr`, async () => {
-      const result = await inspectPoku(`${fixture} --isolation=none`, {
+      const path = isBuild ? fixture.replace(/\.mts$/, '.mjs') : fixture;
+      const result = await inspectPoku(`${path} --isolation=none`, {
         cwd: 'test/__fixtures__/e2e/no-isolate',
       });
       nodeAssert.strictEqual(result.exitCode, 1);

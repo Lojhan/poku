@@ -1,13 +1,12 @@
 import type { Watcher } from '../services/watch.js';
 import process from 'node:process';
 import { GLOBAL } from '../configs/poku.js';
-import { results } from '../configs/results.js';
+import { errors, results } from '../configs/results.js';
 import { onSigint, poku } from '../modules/essentials/poku.js';
 import { getArg } from '../parsers/get-arg.js';
 import { availableParallelism } from '../polyfills/os.js';
 import { format } from '../services/format.js';
 import { mapTests, normalizePath } from '../services/map-tests.js';
-import { errors } from '../services/reporters/poku.js';
 import { watch } from '../services/watch.js';
 import { hr, log } from '../services/write.js';
 
@@ -19,11 +18,13 @@ export const startWatch = async (dirs: string[]) => {
   const executing = new Set<string>();
   const interval = Number(getArg('watchInterval')) || 1500;
 
-  const setIsRunning = (value: boolean): void => {
-    isRunning = value;
+  const addWatcher = (pending: Promise<Watcher>) => {
+    pending.then((watcher) => {
+      watchers.add(watcher);
+    });
   };
 
-  const resultsClear = (): void => {
+  const resultsClear = () => {
     errors.length = 0;
     results.passed = 0;
     results.failed = 0;
@@ -31,7 +32,7 @@ export const startWatch = async (dirs: string[]) => {
     results.todo = 0;
   };
 
-  const listenStdin = async (input: Buffer | string): Promise<void> => {
+  const listenStdin = async (input: Buffer | string) => {
     if (isRunning || executing.size > 0) return;
 
     if (String(input).trim() === 'rs') {
@@ -60,12 +61,12 @@ export const startWatch = async (dirs: string[]) => {
         const filePath = normalizePath(file);
         if (executing.has(filePath) || isRunning || executing.size > 0) return;
 
-        setIsRunning(true);
-        executing.add(filePath);
-        resultsClear();
-
         const tests = mappedTests.get(filePath);
         if (!tests) return;
+
+        isRunning = true;
+        executing.add(filePath);
+        resultsClear();
 
         await poku(Array.from(tests), {
           ...configs,
@@ -76,14 +77,12 @@ export const startWatch = async (dirs: string[]) => {
 
         setTimeout(() => {
           executing.delete(filePath);
-          setIsRunning(false);
+          isRunning = false;
         }, interval);
       }
     });
 
-    currentWatcher.then((watcher) => {
-      watchers.add(watcher);
-    });
+    addWatcher(currentWatcher);
   }
 
   for (const dir of dirs) {
@@ -91,22 +90,20 @@ export const startWatch = async (dirs: string[]) => {
       if (event === 'change') {
         if (executing.has(file) || isRunning || executing.size > 0) return;
 
-        setIsRunning(true);
+        isRunning = true;
         executing.add(file);
         resultsClear();
 
         poku(file).then(() =>
           setTimeout(() => {
             executing.delete(file);
-            setIsRunning(false);
+            isRunning = false;
           }, interval)
         );
       }
     });
 
-    currentWatcher.then((watcher) => {
-      watchers.add(watcher);
-    });
+    addWatcher(currentWatcher);
   }
 
   hr();

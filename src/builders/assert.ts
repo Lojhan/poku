@@ -23,6 +23,12 @@ const resolveInternalMessage = (message?: AssertionMessage): string =>
     ? message
     : 'Assertion Error';
 
+const resolveMessage = (
+  errorOrMessage: AssertPredicate | AssertionMessage | undefined,
+  message: AssertionMessage | undefined
+): AssertionMessage | undefined =>
+  typeof errorOrMessage === 'string' ? errorOrMessage : message;
+
 export const createAssert = (nodeAssert: typeof assert) => {
   const ok: AssertValue = (value, message) =>
     processAssert(() => nodeAssert.ok(value, resolveInternalMessage(message)), {
@@ -135,19 +141,19 @@ export const createAssert = (nodeAssert: typeof assert) => {
     block: () => unknown,
     errorOrMessage?: AssertPredicate | AssertionMessage,
     message?: AssertionMessage
-  ): void => {
+  ) => {
     processAssert(
       () => {
         if (isPredicate(errorOrMessage))
           nodeAssert.doesNotThrow(block, errorOrMessage, message);
-        else {
-          const msg =
-            typeof errorOrMessage === 'string' ? errorOrMessage : message;
-          nodeAssert.doesNotThrow(block, msg);
-        }
+        else
+          nodeAssert.doesNotThrow(
+            block,
+            resolveMessage(errorOrMessage, message)
+          );
       },
       {
-        message: typeof errorOrMessage === 'string' ? errorOrMessage : message,
+        message: resolveMessage(errorOrMessage, message),
         defaultMessage: 'Expected function not to throw',
         hideDiff: true,
         throw: true,
@@ -159,7 +165,7 @@ export const createAssert = (nodeAssert: typeof assert) => {
     block: () => unknown,
     errorOrMessage?: AssertPredicate | AssertionMessage,
     message?: AssertionMessage
-  ): void => {
+  ) => {
     if (isPredicate(errorOrMessage))
       processAssert(() => nodeAssert.throws(block, errorOrMessage), {
         message,
@@ -182,19 +188,19 @@ export const createAssert = (nodeAssert: typeof assert) => {
     block: AsyncBlock,
     errorOrMessage?: AssertPredicate | AssertionMessage,
     message?: AssertionMessage
-  ): Promise<void> => {
+  ) => {
     await processAsyncAssert(
       async () => {
         if (isPredicate(errorOrMessage))
           await nodeAssert.rejects(block, errorOrMessage, message);
-        else {
-          const msg =
-            typeof errorOrMessage === 'string' ? errorOrMessage : message;
-          await nodeAssert.rejects(block, msg);
-        }
+        else
+          await nodeAssert.rejects(
+            block,
+            resolveMessage(errorOrMessage, message)
+          );
       },
       {
-        message: typeof errorOrMessage === 'string' ? errorOrMessage : message,
+        message: resolveMessage(errorOrMessage, message),
         defaultMessage: 'Expected promise to be rejected with specified error',
         hideDiff: true,
         throw: true,
@@ -206,7 +212,7 @@ export const createAssert = (nodeAssert: typeof assert) => {
     block: AsyncBlock,
     errorOrMessage?: AssertPredicate | AssertionMessage,
     message?: AssertionMessage
-  ): Promise<void> => {
+  ) => {
     await processAsyncAssert(
       async () => {
         if (isPredicate(errorOrMessage))
@@ -214,7 +220,7 @@ export const createAssert = (nodeAssert: typeof assert) => {
         else await nodeAssert.doesNotReject(block, message);
       },
       {
-        message: typeof errorOrMessage === 'string' ? errorOrMessage : message,
+        message: resolveMessage(errorOrMessage, message),
         defaultMessage: 'Got unwanted rejection',
         hideDiff: true,
         throw: true,

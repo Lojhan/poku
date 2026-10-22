@@ -1,6 +1,7 @@
 import type { RetryConfig, RetryContext } from '../../@types/retry.js';
 import { GLOBAL } from '../../configs/poku.js';
-import { retryContext } from '../../configs/retry.js';
+import { peekRetryContext, retryContext } from '../../configs/retry.js';
+import { sleep } from './wait-for.js';
 
 export async function retry(
   config: number | RetryConfig,
@@ -8,6 +9,9 @@ export async function retry(
 ): Promise<void> {
   const attempts = typeof config === 'number' ? config : config.attempts;
   const delay = typeof config === 'number' ? 0 : (config.delay ?? 0);
+
+  let lastError: unknown;
+  let hasError = false;
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const context: RetryContext = {
@@ -22,7 +26,9 @@ export async function retry(
     await retryContext.run(context, async () => {
       try {
         await callback();
-      } catch {
+      } catch (error) {
+        lastError = error;
+        hasError = true;
         context.failed = true;
       }
     });
@@ -39,11 +45,13 @@ export async function retry(
     GLOBAL.reporter.onRetryEnd?.({ attempt, total: attempts, success: false });
 
     if (attempt < attempts && delay > 0) {
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await sleep(delay);
     }
   }
 
-  const parent = retryContext.stack?.[retryContext.stack.length - 1];
+  const parent = peekRetryContext();
   if (parent) parent.failed = true;
   else process.exitCode = 1;
+
+  if (hasError) throw lastError;
 }

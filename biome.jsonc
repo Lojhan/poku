@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
   "assist": {
     "actions": {
       "source": {
@@ -16,7 +16,9 @@
       "!!lib",
       "!!node_modules",
       "!!test/__fixtures__",
-      "!!website"
+      "!!website",
+      "!!.claude",
+      "!!temp"
     ],
     "ignoreUnknown": true
   },

@@ -17,7 +17,7 @@ export class Watcher {
     this.callback = callback;
   }
 
-  private watchFile(filePath: string): void {
+  private watchFile(filePath: string) {
     if (this.fileWatchers.has(filePath)) return;
 
     const watcher = nodeWatch(filePath, (eventType) =>
@@ -27,14 +27,14 @@ export class Watcher {
     this.fileWatchers.set(filePath, watcher);
   }
 
-  private unwatchFiles(): void {
-    for (const [filePath, watcher] of this.fileWatchers) {
+  private unwatchMap(watchers: Map<string, FSWatcher>) {
+    for (const [path, watcher] of watchers) {
       watcher.close();
-      this.fileWatchers.delete(filePath);
+      watchers.delete(path);
     }
   }
 
-  private syncFileWatchers(filePaths: string[]): void {
+  private syncFileWatchers(filePaths: string[]) {
     const next = new Set(filePaths);
 
     for (const [filePath, watcher] of this.fileWatchers) {
@@ -47,7 +47,7 @@ export class Watcher {
     for (const filePath of filePaths) this.watchFile(filePath);
   }
 
-  private async watchDirectory(dir: string): Promise<void> {
+  private async watchDirectory(dir: string) {
     if (this.dirWatchers.has(dir)) return;
 
     const watcher = nodeWatch(dir, async (_, filename) => {
@@ -76,7 +76,7 @@ export class Watcher {
     }
   }
 
-  async start(): Promise<void> {
+  async start() {
     const stats = await stat(this.rootDir);
 
     if (stats.isDirectory()) {
@@ -91,16 +91,9 @@ export class Watcher {
     this.watchFile(this.rootDir);
   }
 
-  stop(): void {
-    this.unwatchFiles();
-    this.unwatchDirectories();
-  }
-
-  private unwatchDirectories(): void {
-    for (const [dirPath, watcher] of this.dirWatchers) {
-      watcher.close();
-      this.dirWatchers.delete(dirPath);
-    }
+  stop() {
+    this.unwatchMap(this.fileWatchers);
+    this.unwatchMap(this.dirWatchers);
   }
 }
 

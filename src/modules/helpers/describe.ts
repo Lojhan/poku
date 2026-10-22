@@ -3,10 +3,11 @@ import { AssertionError } from 'node:assert';
 import process from 'node:process';
 import { indentation } from '../../configs/indentation.js';
 import { errorHoist, GLOBAL } from '../../configs/poku.js';
-import { retryContext } from '../../configs/retry.js';
+import { peekRetryContext } from '../../configs/retry.js';
 import { checkOnly } from '../../parsers/callback.js';
 import { hasOnly } from '../../parsers/get-arg.js';
 import { getCallback, getTitle } from '../../parsers/get-test-args.js';
+import { hrtimeToMs } from '../../parsers/time.js';
 import { createOnlyDescribe, skip, todo } from './modifiers.js';
 
 const getOptions = (input: unknown): DescribeOptions | undefined =>
@@ -15,7 +16,7 @@ const getOptions = (input: unknown): DescribeOptions | undefined =>
 export const describeBase = async (
   titleOrCb: string | (() => unknown | Promise<unknown>),
   callbackOrOptions?: (() => unknown | Promise<unknown>) | DescribeOptions
-): Promise<void> => {
+) => {
   const { reporter } = GLOBAL;
   const title = getTitle(titleOrCb);
   const hasTitle = typeof title === 'string';
@@ -36,10 +37,11 @@ export const describeBase = async (
 
   if (!hasCB) return;
 
-  const onError = (error: unknown): void => {
+  const onError = (error: unknown) => {
     process.exitCode = 1;
     success = false;
     errorHoist.failed = true;
+
     if (!(error instanceof AssertionError)) console.error(error);
   };
 
@@ -66,14 +68,14 @@ export const describeBase = async (
     if (process.exitCode !== initialExitCode) success = false;
 
     if (!success) {
-      const ctx = retryContext.stack?.[retryContext.stack.length - 1];
+      const ctx = peekRetryContext();
       if (ctx) ctx.failed = true;
     }
   }
 
   if (!title) return;
 
-  const duration = end[0] * 1e3 + end[1] / 1e6;
+  const duration = hrtimeToMs(end);
 
   indentation.describeDepth--;
   reporter.onDescribeEnd({ title, duration, success });
@@ -84,7 +86,7 @@ export const describeBase = async (
 const describeCore = (async (
   messageOrCb: string | (() => unknown | Promise<unknown>),
   cbOrOptions?: (() => unknown | Promise<unknown>) | DescribeOptions
-): Promise<void> => {
+) => {
   if (typeof messageOrCb === 'string' && typeof cbOrOptions !== 'function')
     return describeBase(messageOrCb, cbOrOptions);
 

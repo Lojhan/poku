@@ -82,10 +82,13 @@ describe('Retry context isolation', async () => {
   await it('restores the retry context after asynchronous rejection', async () => {
     const previousExitCode = process.exitCode;
     try {
-      await retry(1, async () => {
-        await Promise.resolve();
-        throw new Error('retry exhausted');
-      });
+      await nodeAssert.rejects(
+        retry(1, async () => {
+          await Promise.resolve();
+          throw new Error('retry exhausted');
+        }),
+        /retry exhausted/
+      );
       nodeAssert.strictEqual(retryContext.stack, null);
       nodeAssert.strictEqual(process.exitCode, 1);
     } finally {

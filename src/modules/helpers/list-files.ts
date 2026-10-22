@@ -3,7 +3,7 @@ import { stat as fsStat, readdir } from 'node:fs/promises';
 import { join, sep } from 'node:path';
 import { env } from 'node:process';
 import { states } from '../../configs/poku.js';
-import { escapeRegExp } from '../../parsers/escape-regexp.js';
+import { envToRegExp } from '../../parsers/escape-regexp.js';
 
 const regex = {
   sep: /[/\\]+/g,
@@ -27,20 +27,17 @@ export const sanitizePath = (input: string, ensureTarget?: boolean): string => {
 export const isFile = async (fullPath: string) =>
   (await fsStat(fullPath)).isFile();
 
-const envFilter = env.FILTER?.trim()
-  ? new RegExp(escapeRegExp(env.FILTER), 'i')
-  : undefined;
+const envFilter = envToRegExp(env.FILTER, 'i');
 
 const getAllFilesInner = async (
   dirPath: string,
   files: Set<string>,
   filter: RegExp,
-  exclude: RegExp[] | undefined
+  exclude: RegExp[] | undefined,
+  knownDirectory?: boolean
 ): Promise<Set<string>> => {
   try {
-    const stat = await fsStat(dirPath);
-
-    if (stat.isFile()) {
+    if (!knownDirectory && (await fsStat(dirPath)).isFile()) {
       const fullPath = sanitizePath(dirPath);
 
       if (
@@ -62,7 +59,7 @@ const getAllFilesInner = async (
       return files;
     }
 
-    const entries = await readdir(sanitizePath(dirPath), {
+    const entries = await readdir(dirPath, {
       withFileTypes: true,
     });
     const subdirs: Promise<Set<string>>[] = [];
@@ -77,7 +74,7 @@ const getAllFilesInner = async (
       if (entry.isFile()) {
         if (filter.test(fullPath)) files.add(fullPath);
       } else if (entry.isDirectory()) {
-        subdirs.push(getAllFilesInner(fullPath, files, filter, exclude));
+        subdirs.push(getAllFilesInner(fullPath, files, filter, exclude, true));
       }
     }
 

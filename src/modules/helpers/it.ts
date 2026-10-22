@@ -6,9 +6,10 @@ import process from 'node:process';
 import { each } from '../../configs/each.js';
 import { indentation } from '../../configs/indentation.js';
 import { errorHoist, GLOBAL } from '../../configs/poku.js';
-import { retryContext } from '../../configs/retry.js';
+import { peekRetryContext } from '../../configs/retry.js';
 import { hasOnly } from '../../parsers/get-arg.js';
 import { getCallback, getTitle } from '../../parsers/get-test-args.js';
+import { hrtimeToMs } from '../../parsers/time.js';
 import { createOnlyIt, skip, todo } from './modifiers.js';
 
 const SCOPE_HOOKS_KEY = Symbol.for('@pokujs/poku.test-scope-hooks');
@@ -43,7 +44,7 @@ export const itBase = async (
     const reportResult = (): void => {
       if (!title) return;
 
-      const duration = end[0] * 1e3 + end[1] / 1e6;
+      const duration = hrtimeToMs(end);
 
       indentation.itDepth--;
       increasedDepth = false;
@@ -75,7 +76,7 @@ export const itBase = async (
 
         if (!insideDescribe) {
           onError = (error: unknown): void => {
-            const ctx = retryContext.stack?.[retryContext.stack.length - 1];
+            const ctx = peekRetryContext();
             if (ctx) {
               ctx.failed = true;
             } else {
@@ -95,7 +96,7 @@ export const itBase = async (
           const resultCb = cb!(params);
           if (resultCb instanceof Promise) await resultCb;
         } catch (error) {
-          const ctx = retryContext.stack?.[retryContext.stack.length - 1];
+          const ctx = peekRetryContext();
           if (ctx) {
             ctx.failed = true;
           } else {
@@ -110,7 +111,7 @@ export const itBase = async (
             process.removeListener('uncaughtException', onError);
             process.removeListener('unhandledRejection', onError);
           } else if (errorHoist.failed) {
-            const ctx = retryContext.stack?.[retryContext.stack.length - 1];
+            const ctx = peekRetryContext();
             if (ctx) {
               ctx.failed = true;
             } else {
@@ -138,21 +139,18 @@ export const itBase = async (
   }
 };
 
-const itCore = (async (
-  titleOrCb: string | TestCb,
-  cb?: TestCb
-): Promise<void> => {
-  if (GLOBAL.configs.testNamePattern && typeof titleOrCb === 'string') {
-    if (!GLOBAL.configs.testNamePattern.test(titleOrCb)) return;
+const itCore = (async (titleOrCb: string | TestCb, cb?: TestCb) => {
+  if (typeof titleOrCb === 'string') {
+    if (
+      GLOBAL.configs.testNamePattern &&
+      !GLOBAL.configs.testNamePattern.test(titleOrCb)
+    )
+      return;
+
+    if (GLOBAL.configs.testSkipPattern?.test(titleOrCb)) return;
   }
 
-  if (GLOBAL.configs.testSkipPattern && typeof titleOrCb === 'string') {
-    if (GLOBAL.configs.testSkipPattern.test(titleOrCb)) return;
-  }
-
-  if (hasOnly) {
-    if (!GLOBAL.runAsOnly) return;
-  }
+  if (hasOnly && !GLOBAL.runAsOnly) return;
 
   if (typeof titleOrCb === 'string' && cb) return itBase(titleOrCb, cb);
   if (typeof titleOrCb === 'function') return itBase(titleOrCb);

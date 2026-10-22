@@ -21,19 +21,12 @@ export type PluginContext = {
 };
 
 export type PokuPlugin = {
-  /** Plugin name */
   name?: string;
-  /** Modify the command array before spawning a test file process */
   runner?: (command: string[], file: string) => string[];
-  /** Run before the test suite begins */
   setup?: (context: PluginContext) => void | Promise<void>;
-  /** Run after the test suite completes */
   teardown?: (context: PluginContext) => void | Promise<void>;
-  /** Enable IPC channel for child processes */
   ipc?: boolean;
-  /** Called after each test file process is spawned */
   onTestProcess?: (child: ChildProcess, file: string) => void;
-  /** Intercept file discovery. Return the file paths to use */
   discoverFiles?: (
     paths: string[],
     context: PluginContext
